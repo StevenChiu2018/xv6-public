@@ -1745,6 +1745,58 @@ rand()
   return randstate;
 }
 
+void OStests()
+{
+  int fd, i, total, cc;
+  printf(1, "bigfile test\n");
+
+  unlink("bigfile");
+  fd = open("bigfile", O_CREATE | O_RDWR);
+  if(fd < 0){
+    printf(1, "cannot create bigfile");
+    exit();
+  }
+
+  for(i = 0; i < 1000; i++){
+
+    memset(buf, i, 512);
+    printf(1,"%d\n",i);
+    if(write(fd, buf, 512) != 512){
+      printf(1, "write bigfile failed\n");
+      exit();
+    }
+  }
+  close(fd);
+
+  fd = open("bigfile", 0);
+  if(fd < 0){
+    printf(1, "cannot open bigfile\n");
+    exit();
+  }
+  total = 0;
+  for(i = 0; ; i++){
+    printf(1,"%d\n",i);
+    cc = read(fd, buf, 512);
+    if(cc < 0){
+      printf(1, "read bigfile failed\n");
+      exit();
+    }
+    if(cc == 0)
+      break;
+    if(cc != 512){
+      printf(1, "short read bigfile\n");
+      exit();
+    }
+   /* if(buf[0] != i/2 || buf[299] != i/2){
+      printf(1, "read bigfile wrong data\n");
+      exit();
+    }*/
+    total += cc;
+  }
+  printf(1,"%d\n",total);
+  close(fd);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -1755,8 +1807,8 @@ main(int argc, char *argv[])
     exit();
   }
   close(open("usertests.ran", O_CREATE));
-
-  argptest();
+  OStests();
+  /*argptest();
   createdelete();
   linkunlink();
   concreate();
@@ -1797,7 +1849,7 @@ main(int argc, char *argv[])
 
   uio();
 
-  exectest();
+  exectest();*/
 
   exit();
 }

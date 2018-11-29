@@ -370,7 +370,7 @@ iunlockput(struct inode *ip)
 
 // Return the disk block address of the nth block in inode ip.
 // If there is no such block, bmap allocates one.
-static uint
+/*static uint
 bmap(struct inode *ip, uint bn)
 {
   uint addr, *a;
@@ -398,7 +398,95 @@ bmap(struct inode *ip, uint bn)
   }
 
   panic("bmap: out of range");
+}*/
+static uint
+bmap(struct inode *ip, uint bn)
+{
+  uint addr, *a, *indirect;//,cacheaddr,cachebn;
+  struct buf *bp;//,*cache;
+  if(bn < NDIRECT){
+    if((addr = ip->addrs[bn]) == 0)
+      ip->addrs[bn] = addr =balloc(ip->dev);
+    return addr;
+  }
+  bn -= NDIRECT;
+  if(bn < (NINDIRECT-2)){
+    if((addr = ip->addrs[NDIRECT]) == 0)
+      ip->addrs[NDIRECT] = addr =balloc(ip->dev);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if((addr = a[bn]) == 0){
+      a[bn] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    return addr;
+  }
+  /*bn -= (NINDIRECT-2);
+  addr = ip->addrs[NDIRECT];
+  cache=bread(ip->dev,addr);
+  cacheaddr=cache->data[NINDIRECT-1];
+  cachebn=cache->data[NINDIRECT-2];
+  if(cachebn<=bn&&(cachebn+128)>bn)
+  {
+    bn-=cachebn;
+    bp=bread(ip->dev,cacheaddr);
+    indirect=(uint*)bp->data;
+    if((addr=indirect[bn])==0)
+		{
+			addr=indirect[bn]=balloc(ip->dev);
+			log_write(bp);
+		}
+    brelse(bp);
+    brelse(cache);
+    return addr;
+  }*/
+//載入額外空間
+//int limit=10000;
+ if (1) {
+    if((addr = ip->addrs[NDIRECT + 1]) == 0)
+      ip->addrs[NDIRECT + 1] = addr =balloc(ip->dev);
+    bp = bread(ip->dev, addr);
+    indirect = (uint *) bp->data;
+    int count=-1;
+  while(bn>=(NINDIRECT-1))
+  {
+    count++;
+    if((addr=indirect[NINDIRECT-1])==0)
+    {
+      addr=indirect[NINDIRECT-1]=balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    bp=bread(ip->dev,addr);
+    indirect=(uint*)bp->data;
+    bn-=(NINDIRECT-1);
+	}
+  /*if(count!=-1)
+  {
+    cache->data[NINDIRECT-1]=addr;
+    cache->data[NINDIRECT-2]=count*127;
+  }
+  brelse*/
+	//Load address
+	if(bn<(NINDIRECT-1))
+	{
+		if((addr=indirect[bn])==0)
+		{
+			addr=indirect[bn]=balloc(ip->dev);
+			log_write(bp);
+		}
+	}
+	else
+	{
+		panic("Oh God!");
+	}
+  brelse(bp);
+  return addr;
+  }
+  panic("bmap: out of range");
 }
+
 
 // Truncate inode (discard contents).
 // Only called when the inode has no links
