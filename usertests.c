@@ -1757,7 +1757,7 @@ void OStests()
     exit();
   }
 
-  for(i = 0; i < 1000; i++){
+  for(i = 0; i < 10000; i++){
 
     memset(buf, i, 512);
     printf(1,"%d\n",i);

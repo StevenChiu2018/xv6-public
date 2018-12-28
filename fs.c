@@ -402,15 +402,16 @@ bmap(struct inode *ip, uint bn)
 static uint
 bmap(struct inode *ip, uint bn)
 {
-  uint addr, *a, *indirect;//,cacheaddr,cachebn;
-  struct buf *bp;//,*cache;
+  uint addr, *a, *indirect,cacheaddr,cachebn,*tmpfordata,start=1;
+  struct buf *bp,*cache;
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr =balloc(ip->dev);
     return addr;
   }
   bn -= NDIRECT;
-  if(bn < (NINDIRECT-2)){
+  if(bn < (NINDIRECT-2))
+  {
     if((addr = ip->addrs[NDIRECT]) == 0)
       ip->addrs[NDIRECT] = addr =balloc(ip->dev);
     bp = bread(ip->dev, addr);
@@ -422,67 +423,78 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
-  /*bn -= (NINDIRECT-2);
-  addr = ip->addrs[NDIRECT];
-  cache=bread(ip->dev,addr);
-  cacheaddr=cache->data[NINDIRECT-1];
-  cachebn=cache->data[NINDIRECT-2];
-  if(cachebn<=bn&&(cachebn+128)>bn)
+  bn -= (NINDIRECT-2);
+  cache=bread(ip->dev,ip->addrs[NDIRECT]);
+  tmpfordata=(uint*)cache->data;
+  cacheaddr=tmpfordata[NINDIRECT-1];
+  cachebn=tmpfordata[NINDIRECT-2];
+  if(cacheaddr!=0&&cachebn<=bn&&bn<(cachebn+127))
   {
+    //panic("great");
     bn-=cachebn;
     bp=bread(ip->dev,cacheaddr);
     indirect=(uint*)bp->data;
     if((addr=indirect[bn])==0)
 		{
-			addr=indirect[bn]=balloc(ip->dev);
+			indirect[bn]=addr=balloc(ip->dev);
 			log_write(bp);
 		}
     brelse(bp);
     brelse(cache);
     return addr;
-  }*/
-//載入額外空間
-//int limit=10000;
- if (1) {
-    if((addr = ip->addrs[NDIRECT + 1]) == 0)
-      ip->addrs[NDIRECT + 1] = addr =balloc(ip->dev);
-    bp = bread(ip->dev, addr);
-    indirect = (uint *) bp->data;
-    int count=-1;
-  while(bn>=(NINDIRECT-1))
+  }
+  else if(cacheaddr!=0&&bn>=(cachebn+127))
   {
-    count++;
-    if((addr=indirect[NINDIRECT-1])==0)
+    start=0;
+  }
+//載入額外空間
+  if (1) 
+  {
+    uint bnrecord=bn;
+    if(start==1)
     {
-      addr=indirect[NINDIRECT-1]=balloc(ip->dev);
-      log_write(bp);
+      if((addr = ip->addrs[NDIRECT + 1]) == 0)
+        ip->addrs[NDIRECT + 1] = addr =balloc(ip->dev);
+      bp = bread(ip->dev, addr);
+    }
+    else
+    {
+      addr=0;
+      bp=bread(ip->dev,cacheaddr);
+      bn-=cachebn;
+    }
+    indirect = (uint *) bp->data;
+    while(bn>=(NINDIRECT-1))
+    {
+      if((addr=indirect[NINDIRECT-1])==0)
+      {
+        addr=indirect[NINDIRECT-1]=balloc(ip->dev);
+        log_write(bp);
+      }
+      brelse(bp);
+      bp=bread(ip->dev,addr);
+      indirect=(uint*)bp->data;
+      bn-=(NINDIRECT-1);
+    }
+    tmpfordata[NINDIRECT-1]=addr;
+    tmpfordata[NINDIRECT-2]=(bnrecord-bn);
+    bwrite(cache);
+    brelse(cache);
+    //Load address
+    if(bn<(NINDIRECT-1))
+    {
+      if((addr=indirect[bn])==0)
+      {
+        addr=indirect[bn]=balloc(ip->dev);
+        log_write(bp);
+      }
+    }
+    else
+    {
+      panic("Oh God!");
     }
     brelse(bp);
-    bp=bread(ip->dev,addr);
-    indirect=(uint*)bp->data;
-    bn-=(NINDIRECT-1);
-	}
-  /*if(count!=-1)
-  {
-    cache->data[NINDIRECT-1]=addr;
-    cache->data[NINDIRECT-2]=count*127;
-  }
-  brelse*/
-	//Load address
-	if(bn<(NINDIRECT-1))
-	{
-		if((addr=indirect[bn])==0)
-		{
-			addr=indirect[bn]=balloc(ip->dev);
-			log_write(bp);
-		}
-	}
-	else
-	{
-		panic("Oh God!");
-	}
-  brelse(bp);
-  return addr;
+    return addr;
   }
   panic("bmap: out of range");
 }
